@@ -1,19 +1,14 @@
--- [[ ROBLOX FPS BOOSTER & LAG FIX SCRIPT - FIXED ]]
-
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local Terrain = Workspace:FindFirstChildOfClass("Terrain")
 local LocalPlayer = Players.LocalPlayer
-
 -- Tạo Giao Diện Nút Bấm (UI)
 local ScreenGui = Instance.new("ScreenGui")
 local ToggleButton = Instance.new("TextButton")
 local UICorner = Instance.new("UICorner")
-
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 ScreenGui.ResetOnSpawn = false
-
 ToggleButton.Name = "LagFixToggle"
 ToggleButton.Parent = ScreenGui
 ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -23,11 +18,8 @@ ToggleButton.Font = Enum.Font.SourceSansBold
 ToggleButton.Text = "Fix Lag: OFF"
 ToggleButton.TextColor3 = Color3.fromRGB(255, 100, 100)
 ToggleButton.TextSize = 16.000
-
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = ToggleButton
-
--- Biến lưu trạng thái và cài đặt gốc
 local isOptimized = false
 local originalSettings = {
     GlobalShadows = Lighting.GlobalShadows,
@@ -48,23 +40,15 @@ local function optimizeObject(obj)
         obj.Enabled = false
     end
 end
-
--- Hàm tối ưu hóa (Bật/Tắt)
 local function ToggleLagFix()
     isOptimized = not isOptimized
-    
     if isOptimized then
-        -- 1. Đổi trạng thái Nút
         ToggleButton.Text = "Fix Lag: ON"
         ToggleButton.TextColor3 = Color3.fromRGB(100, 255, 100)
         ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 50, 20)
-        
-        -- 2. Tắt bóng đổ và giảm tầm nhìn (Fog)
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 250
         if Terrain then Terrain.Decoration = false end
-        
-        -- 3. Duyệt qua toàn bộ map AN TOÀN
         local descendants = Workspace:GetDescendants()
         task.spawn(function()
             for i, obj in ipairs(descendants) do
@@ -79,7 +63,6 @@ local function ToggleLagFix()
         
         print("Chế độ siêu mượt đã KÍCH HOẠT!")
     else
-        -- Khôi phục lại cài đặt mặc định khi tắt
         ToggleButton.Text = "Fix Lag: OFF"
         ToggleButton.TextColor3 = Color3.fromRGB(255, 100, 100)
         ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -91,14 +74,10 @@ local function ToggleLagFix()
         print("Đã QUAY LẠI cài đặt gốc.")
     end
 end
-
--- 4. Lắng nghe vật thể mới được thêm vào
 Workspace.DescendantAdded:Connect(function(obj)
     if isOptimized then
         task.wait() -- Đã sửa lỗi chính tả ở đây
         optimizeObject(obj)
     end
 end)
-
--- Lắng nghe sự kiện click chuột/ấn nút
 ToggleButton.MouseButton1Click:Connect(ToggleLagFix)
