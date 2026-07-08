@@ -1,0 +1,135 @@
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Terrain = Workspace:FindFirstChildOfClass("Terrain")
+local LocalPlayer = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("TextButton")
+local UICorner = Instance.new("UICorner")
+
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+ToggleButton.Name = "LagFixToggle"
+ToggleButton.Parent = ScreenGui
+ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0.5, -20)
+ToggleButton.Size = UDim2.new(0, 120, 0, 40)
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Text = "Fix Lag: OFF"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+ToggleButton.TextSize = 16
+
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = ToggleButton
+
+local isOptimized = false
+
+local originalLighting = {
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    TerrainDecoration = Terrain and Terrain.Decoration or false,
+}
+
+-- Lưu trạng thái gốc của từng object đã bị chỉnh, để restore đúng khi tắt
+-- key = Instance, value = { Material = ..., CastShadow = ..., Enabled = ... }
+local savedStates = setmetatable({}, { __mode = "k" }) -- weak keys, tránh leak khi object bị destroy
+
+local function optimizeObject(obj)
+    local ok, err = pcall(function()
+        if obj:IsA("BasePart") then
+            if not savedStates[obj] then
+                savedStates[obj] = {
+                    Material = obj.Material,
+                    CastShadow = obj.CastShadow,
+                }
+            end
+            if obj.Material ~= Enum.Material.Neon and obj.Transparency < 1 then
+                obj.Material = Enum.Material.SmoothPlastic
+            end
+            obj.CastShadow = false
+
+        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then
+            if not savedStates[obj] then
+                savedStates[obj] = { Enabled = obj.Enabled }
+            end
+            obj.Enabled = false
+
+        elseif obj:IsA("PostEffect") then -- bao gồm Bloom/Blur/SunRays/ColorCorrection...
+            if not savedStates[obj] then
+                savedStates[obj] = { Enabled = obj.Enabled }
+            end
+            obj.Enabled = false
+        end
+    end)
+    if not ok then
+        warn("optimizeObject lỗi trên", obj:GetFullName(), err)
+    end
+end
+
+local function restoreObject(obj, state)
+    pcall(function()
+        if state.Material ~= nil then obj.Material = state.Material end
+        if state.CastShadow ~= nil then obj.CastShadow = state.CastShadow end
+        if state.Enabled ~= nil then obj.Enabled = state.Enabled end
+    end)
+end
+
+local function restoreAll()
+    for obj, state in pairs(savedStates) do
+        if obj and obj.Parent then
+            restoreObject(obj, state)
+        end
+    end
+    -- Xoá bảng lưu sau khi restore xong để lần bật lại sau sạch sẽ
+    savedStates = setmetatable({}, { __mode = "k" })
+end
+
+local function ToggleLagFix()
+    isOptimized = not isOptimized
+
+    if isOptimized then
+        ToggleButton.Text = "Fix Lag: ON"
+        ToggleButton.TextColor3 = Color3.fromRGB(100, 255, 100)
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(20, 50, 20)
+
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 250
+        if Terrain then Terrain.Decoration = false end
+
+        local descendants = Workspace:GetDescendants()
+        task.spawn(function()
+            for i, obj in ipairs(descendants) do
+                if not isOptimized then break end
+                optimizeObject(obj)
+                if i % 200 == 0 then
+                    task.wait()
+                end
+            end
+        end)
+
+        print("Chế độ siêu mượt đã KÍCH HOẠT!")
+    else
+        ToggleButton.Text = "Fix Lag: OFF"
+        ToggleButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+
+        Lighting.GlobalShadows = originalLighting.GlobalShadows
+        Lighting.FogEnd = originalLighting.FogEnd
+        if Terrain then Terrain.Decoration = originalLighting.TerrainDecoration end
+
+        restoreAll()
+
+        print("Đã QUAY LẠI cài đặt gốc.")
+    end
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+    if isOptimized then
+        task.wait()
+        optimizeObject(obj)
+    end
+end)
+
+ToggleButton.MouseButton1Click:Connect(ToggleLagFix)
